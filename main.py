@@ -1,7 +1,9 @@
 import pandas as pd
+import json
+from openpyxl import load_workbook
 
 farmer = pd.read_excel("farmer_sheet.xlsx")
-farmer
+bid_report = pd.read_excel("bid_data.xlsx")
 
 """
 this function shows farmer count
@@ -34,7 +36,7 @@ def pesticides(farmer):
     new_df = new_df.groupby('fpo_name')['values']
     re = []
     for k1,k2 in new_df.apply(list).to_dict().items():
-        re.append({"label":k1,"value":k2})
+        re.append({k1:k2})
     return re
 
 """
@@ -62,7 +64,7 @@ def fertlizer(farmer):
     new_df = new_df.groupby('fpo_name')['values']
     re = []
     for k1,k2 in new_df.apply(list).to_dict().items():
-        re.append({"label":k1,"value":k2})
+        re.append({k1:k2})
     return re
 
 """
@@ -90,31 +92,22 @@ def seeds(farmer):
     new_df = new_df.groupby('fpo_name')['values']
     re = []
     for k1,k2 in new_df.apply(list).to_dict().items():
-        re.append({"label":k1,"value":k2})
+        re.append({k1:k2})
     return re
 seeds(farmer)
 
 """
 this function main bar chart function
 """
-def bar_chart():
-    data = {"type":"bar",
-    "dataset":
-    {
-        "pesticides":[{
-        "dataset":pesticides(farmer)
-    }],
-          "seeds":[{
-        "dataset":seeds(farmer)
-    }],
-          "fertlizer":[{
-        "dataset":fertlizer(farmer)
-    }]
-    }}
+def bar_chart(farmer):
+    data = {
+        "no_of_orders": {
+            "pesticides":pesticides(farmer),
+            "fertilizer":fertlizer(farmer),
+            "seeds":seeds(farmer)
+        },
+    }
     return data
-
-
-bid_report = pd.read_excel("bid_data.xlsx")
 
 """
 this function gentrate status of company bidding status of each product
@@ -123,24 +116,78 @@ def bid_status(bid_report):
     submitted=len(bid_report['company_name'])
     lost = bid_report.loc[bid_report.bid_status == 'lost', 'bid_status'].count()
     won = bid_report.loc[bid_report.bid_status == 'won', 'bid_status'].count()
-    return {"type":"pie","dataset":[submitted,lost,won]}
-import json
-
+    return {"bid_activity":{"submitted":str(submitted),"lost":str(lost),"won":str(won)}}
+    
 """
 this function top bid winner company names 
 """
 def top_bid(bid_report):
     dt = bid_report.sort_values("amount", ascending=False)
-    return {"type":"top_bid","dataset":json.loads(dt[['company_name','product_name','fpo_name','amount']].to_json(orient='records'))}
+    pcompany_name =[]
+    scompany_name =[]
+    fcompany_name =[]
+    for k in json.loads(dt[['company_name','product_name','fpo_name']].to_json(orient='records')):
+        if k['product_name'] == "pesticides":
+            pcompany_name.append({k['company_name']:k['fpo_name']})
+        if k['product_name'] == "seed":
+            scompany_name.append({k['company_name']:k['fpo_name']})
+        if k['product_name'] == "fertlizer":
+            fcompany_name.append({k['company_name']:k['fpo_name']})
+    return {"top_bids":{"pesticides":pcompany_name,"fertilizer":fcompany_name,"seeds":scompany_name}}
+
+
 """
 this is main function of status cards
 """
-def cards(bid_report,company_name):
-    ds = []
-    a = json.loads(bid_report.loc[bid_report['company_name'] == company_name][['bid_status','product_name']].to_json(orient='records'))
-    return {"type":"top_bid","dataset":a}
 
-cards(bid_report,"company1")
+def cards(bid_report,company_name):
+    a = json.loads(bid_report.loc[bid_report['company_name'] == company_name][['bid_status','product_name']].to_json(orient='records'))
+    for k in a:
+        if k['product_name'] == "pesticides":
+            pcompany_name=k['bid_status']
+        else:
+            pcompany_name=None
+        if k['product_name'] == "seed":
+            scompany_name=k['bid_status']
+        else:
+            scompany_name=None
+        if k['product_name'] == "fertlizer":
+            fcompany_name=k['bid_status']
+        else:
+            fcompany_name=None
+    return {"bid_status":{"pesticides":pcompany_name,"fertilizer":fcompany_name,"seeds":scompany_name}}
+
+def main(company_name):
+    result={}
+    a = farmer_count(farmer)
+    b = bar_chart(farmer)
+    c = bid_status(bid_report)
+    d = top_bid(bid_report)
+    e = cards(bid_report,company_name)
+    result.update(a)
+    result.update(b)
+    result.update(c)
+    result.update(d)
+    result.update(e)
+    return result
+
+
+def login(username,pwd):
+    dt = bid_report['company_name']
+    for i in dt:
+        if username ==i and pwd == "igcadmin@123":
+            a = i
+    return a
+
+def insert_data(data):
+    workbook_name = 'farmer_sheet.xlsx'
+    wb = load_workbook(workbook_name)
+    page = wb.active
+    new_data = [data['company_id'],data['company_name'],data['bid_status'],data['product_name'],data['fpo_name'],data['warehouse_loc'],data['amount']]
+    page.append(new_data)
+    wb.save(filename=workbook_name)
+login("company1","igcadmin@123")
+
 
 
 
